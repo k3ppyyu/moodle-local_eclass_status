@@ -1,0 +1,84 @@
+<div class="container-fluid">
+    <h3 class="mb-3">{{#str}} email:body:header, local_eclass_status {{/str}}</h3>
+    <p class="text-muted">{{sitename}} - {{generated}}</p>
+
+    {{#hascritical}}
+    <h5 class="text-danger">{{#str}} email:body:critical_items, local_eclass_status {{/str}}</h5>
+    <table class="table table-bordered table-sm mb-3">
+        <thead class="table-light">
+        <tr>
+            <th>{{#str}} dashboard:col_check, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_observed, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_message, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_threshold, local_eclass_status {{/str}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{#criticalrows}}
+            <tr>
+                <td><strong>{{name}}</strong></td>
+                <td>{{observedvalue}}</td>
+                <td>{{message}}</td>
+                <td>{{threshold}}</td>
+            </tr>
+        {{/criticalrows}}
+        </tbody>
+    </table>
+    {{/hascritical}}
+
+    {{#haswarning}}
+    <h5 class="text-warning">{{#str}} email:body:warning_items, local_eclass_status {{/str}}</h5>
+    <table class="table table-bordered table-sm mb-3">
+        <thead class="table-light">
+        <tr>
+            <th>{{#str}} dashboard:col_check, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_observed, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_message, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_threshold, local_eclass_status {{/str}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{#warningrows}}
+            <tr>
+                <td><strong>{{name}}</strong></td>
+                <td>{{observedvalue}}</td>
+                <td>{{message}}</td>
+                <td>{{threshold}}</td>
+            </tr>
+        {{/warningrows}}
+        </tbody>
+    </table>
+    {{/haswarning}}
+
+    {{#hasinfo}}
+    <h5 class="text-info">{{#str}} email:body:info_items, local_eclass_status {{/str}}</h5>
+    <table class="table table-bordered table-sm mb-3">
+        <thead class="table-light">
+        <tr>
+            <th>{{#str}} dashboard:col_check, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_observed, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_message, local_eclass_status {{/str}}</th>
+            <th>{{#str}} dashboard:col_threshold, local_eclass_status {{/str}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{#inforows}}
+            <tr>
+                <td><strong>{{name}}</strong></td>
+                <td>{{observedvalue}}</td>
+                <td>{{message}}</td>
+                <td>{{threshold}}</td>
+            </tr>
+        {{/inforows}}
+        </tbody>
+    </table>
+    {{/hasinfo}}
+
+    <div class="alert alert-light border">
+        <p class="mb-1">{{#str}} email:body:dashboardhint, local_eclass_status {{/str}}</p>
+        <p class="mb-0"><a href="{{dashboardurl}}">{{dashboardurl}}</a></p>
+    </div>
+
+    <p class="text-muted mt-3">{{footer}}</p>
+</div>
+

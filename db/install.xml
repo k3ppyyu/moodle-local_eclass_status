@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/eclass_status/db" VERSION="20260619" COMMENT="EClass Status plugin database schema"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://moodle.org/xmldb/xmldb.xsd">
+    <TABLES>
+        <TABLE NAME="local_eclass_status_results" COMMENT="Stores health check results for deduplication and digest">
+            <FIELDS>
+                <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true" COMMENT="Primary key"/>
+                <FIELD NAME="timerun" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Timestamp when checks were run"/>
+                <FIELD NAME="results" TYPE="text" NOTNULL="false" COMMENT="JSON-encoded array of check results"/>
+            </FIELDS>
+            <KEYS>
+                <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+            </KEYS>
+            <INDEXES>
+                <INDEX NAME="timerun_idx" UNIQUE="false" FIELDS="timerun"/>
+            </INDEXES>
+        </TABLE>
+    </TABLES>
+</XMLDB>
+

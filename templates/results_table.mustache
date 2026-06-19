@@ -1,0 +1,32 @@
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">{{sectiontitle}}</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+            <thead class="table-light">
+            <tr>
+                <th>{{#str}} dashboard:col_check, local_eclass_status {{/str}}</th>
+                <th>{{#str}} dashboard:col_category, local_eclass_status {{/str}}</th>
+                <th>{{#str}} dashboard:col_status, local_eclass_status {{/str}}</th>
+                <th>{{#str}} dashboard:col_observed, local_eclass_status {{/str}}</th>
+                <th>{{#str}} dashboard:col_threshold, local_eclass_status {{/str}}</th>
+                <th>{{#str}} dashboard:col_message, local_eclass_status {{/str}}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{#rows}}
+                <tr>
+                    <td><strong>{{name}}</strong></td>
+                    <td><code>{{category}}</code></td>
+                    <td><span class="badge {{severitybadgeclass}}">{{severity}}</span></td>
+                    <td>{{observedvalue}}</td>
+                    <td><small>{{threshold}}</small></td>
+                    <td>{{message}}</td>
+                </tr>
+            {{/rows}}
+            </tbody>
+        </table>
+    </div>
+</div>
+

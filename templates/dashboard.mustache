@@ -1,0 +1,76 @@
+<div class="alert alert-info" role="status">
+    {{lastcheck}}
+</div>
+
+{{^hasresults}}
+<div class="alert alert-light border" role="status">
+    {{#str}} dashboard:nodata, local_eclass_status {{/str}}
+</div>
+{{/hasresults}}
+
+{{#hasresults}}
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card border-danger h-100">
+            <div class="card-body text-center">
+                <div class="text-danger fw-semibold">{{#str}} severity:critical, local_eclass_status {{/str}}</div>
+                <div class="display-6">{{criticalcount}}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning h-100">
+            <div class="card-body text-center">
+                <div class="text-warning fw-semibold">{{#str}} severity:warning, local_eclass_status {{/str}}</div>
+                <div class="display-6">{{warningcount}}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info h-100">
+            <div class="card-body text-center">
+                <div class="text-info fw-semibold">{{#str}} severity:info, local_eclass_status {{/str}}</div>
+                <div class="display-6">{{infocount}}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-secondary h-100">
+            <div class="card-body text-center">
+                <div class="text-secondary fw-semibold">{{#str}} dashboard:totalchecks, local_eclass_status {{/str}}</div>
+                <div class="display-6">{{totalcount}}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{#hascritical}}
+    {{#criticaltable}}
+        {{> local_eclass_status/results_table }}
+    {{/criticaltable}}
+{{/hascritical}}
+
+{{#haswarning}}
+    {{#warningtable}}
+        {{> local_eclass_status/results_table }}
+    {{/warningtable}}
+{{/haswarning}}
+
+{{#hasinfo}}
+    {{#infotable}}
+        {{> local_eclass_status/results_table }}
+    {{/infotable}}
+{{/hasinfo}}
+
+<div class="alert alert-light border mt-4">
+    <p class="mb-2 fw-semibold">{{#str}} dashboard:monitoring_help_title, local_eclass_status {{/str}}</p>
+    <ul class="mb-0">
+        <li>{{#str}} dashboard:monitoring_help_item1, local_eclass_status {{/str}}</li>
+        <li>{{#str}} dashboard:monitoring_help_item2, local_eclass_status {{/str}}</li>
+        <li>{{#str}} dashboard:monitoring_help_item3, local_eclass_status {{/str}}</li>
+    </ul>
+</div>
+{{/hasresults}}
+
+
+
