@@ -29,7 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_eclass_status';
 $plugin->version = 2026061900;
-$plugin->requires = 202400000; // Moodle 5.1
+$plugin->requires = 2025100600; // Requires Moodle 5.1 baseline.
 $plugin->maturity = MATURITY_BETA;
 $plugin->release = '1.0.0 (2026-06-19)';
 
