@@ -24,8 +24,11 @@ use core\task\manager;
  *
  * Monitors:
  * - Long-running tasks (warn at 30min, critical at 4hr)
- * - Failed tasks (critical if repeated)
+ * - Failed tasks in retry backoff
  * - Adhoc task queue backlog
+ *
+ * Uses only valid Moodle 5.x task_base API:
+ *   get_timestarted(), get_fail_delay(), get_last_run_time(), get_next_run_time()
  *
  * @package   local_eclass_status
  * @copyright 2026 York University
@@ -36,42 +39,37 @@ class scheduled_tasks_checker implements checker {
     public function check() {
         $results = [];
 
-        // Get all scheduled tasks.
         $tasks = manager::get_all_scheduled_tasks();
 
         foreach ($tasks as $task) {
-            // Check if task is running.
-            $execution = $task->get_last_run_time();
-            $locked = $task->is_locked();
-            $nextrun = $task->get_next_run_time();
-            $faildelay = $task->get_fail_delay();
-
-            $id = "task_" . str_replace('\\', '_', get_class($task));
+            $id   = 'task_' . str_replace('\\', '_', get_class($task));
             $name = $task->get_name();
 
-            if ($locked) {
-                // Task is running.
-                $start_time = $task->get_status_start_time();
-                $duration_sec = time() - $start_time;
-                $duration_min = round($duration_sec / 60);
-                $duration_hr = round($duration_min / 60);
+            // A task is "running" when timestarted is set in the DB record.
+            $timestarted = $task->get_timestarted();
+            $faildelay   = $task->get_fail_delay();
 
-                // Apply severity based on duration.
-                $severity = 'info';
-                $threshold = 'info threshold: < 30 minutes';
-                if ($duration_min > 30 && $duration_min < 120) {
-                    $severity = 'warning';
-                    $threshold = 'warning threshold: 30 minutes - 2 hours';
-                } else if ($duration_min >= 120) {
-                    $severity = 'critical';
-                    $threshold = 'critical threshold: > 4 hours (currently ' . round($duration_min / 60, 1) . ' hr)';
-                    if ($duration_min > 240) {
-                        $severity = 'critical';
-                    }
+            if ($timestarted !== null && $timestarted > 0) {
+                // Task is actively running.
+                $duration_sec = time() - $timestarted;
+                $duration_min = (int)($duration_sec / 60);
+                $duration_hr  = (int)($duration_min / 60);
+
+                // Severity thresholds: warn at 30min, critical at 4hr.
+                $severity  = 'info';
+                $threshold = 'Normal (under 30 minutes)';
+                if ($duration_min >= 240) {
+                    $severity  = 'critical';
+                    $threshold = 'Critical threshold: > 4 hours';
+                } else if ($duration_min >= 30) {
+                    $severity  = 'warning';
+                    $threshold = 'Warning threshold: 30 minutes – 4 hours';
                 }
 
                 $time_str = ($duration_hr >= 1)
-                    ? sprintf('%d hour%s %d minute%s', $duration_hr, $duration_hr === 1 ? '' : 's', $duration_min % 60, ($duration_min % 60) === 1 ? '' : 's')
+                    ? sprintf('%d hour%s %d minute%s',
+                        $duration_hr, $duration_hr === 1 ? '' : 's',
+                        $duration_min % 60, ($duration_min % 60) === 1 ? '' : 's')
                     : sprintf('%d minute%s', $duration_min, $duration_min === 1 ? '' : 's');
 
                 $result = new check_result(
@@ -80,45 +78,49 @@ class scheduled_tasks_checker implements checker {
                     'tasks',
                     $severity,
                     'running',
-                    "Scheduled task is running"
+                    'Scheduled task is currently executing'
                 );
                 $result->observed_value = $time_str . ' elapsed';
-                $result->threshold = $threshold;
-                $result->data = ['duration_seconds' => $duration_sec, 'locked' => true];
-                $results[] = $result;
+                $result->threshold      = $threshold;
+                $result->data           = ['duration_seconds' => $duration_sec, 'running' => true];
+                $results[]              = $result;
 
             } else if ($faildelay > 0) {
-                // Task has failed and is in retry backoff.
+                // Task has failed and is in exponential retry backoff.
                 $result = new check_result(
                     $id,
                     'Task: ' . $name,
                     'tasks',
                     'warning',
                     'failed_retry',
-                    "Task failed and is scheduled for retry"
+                    'Task failed and is scheduled for retry'
                 );
-                $result->observed_value = 'retry at ' . userdate($faildelay);
-                $result->threshold = 'should not have failed';
-                $results[] = $result;
+                $next_retry = $task->get_next_run_time();
+                $result->observed_value = 'next retry: ' . ($next_retry > 0 ? userdate($next_retry) : 'unknown');
+                $result->threshold      = 'should not have failed';
+                $results[]              = $result;
 
             } else {
-                // Task is not running; check if it's overdue or had recent failures.
-                $time_since_run = time() - $execution;
-                $expected_interval = $nextrun - $execution;
-                $overdue = ($time_since_run > $expected_interval * 2);
+                // Task is idle. Check whether it is overdue.
+                $lastrun  = $task->get_last_run_time();
+                $nextrun  = $task->get_next_run_time();
+                $now      = time();
 
-                if ($overdue) {
+                if ($lastrun > 0 && $nextrun > 0 && $now > $nextrun) {
+                    $overdue_sec = $now - $nextrun;
+                    $overdue_min = (int)($overdue_sec / 60);
+
                     $result = new check_result(
                         $id,
                         'Task: ' . $name,
                         'tasks',
                         'warning',
                         'overdue',
-                        "Scheduled task is overdue"
+                        'Scheduled task is overdue'
                     );
-                    $result->observed_value = 'last ran ' . userdate($execution);
-                    $result->threshold = 'should run every ' . round($expected_interval / 60) . ' minutes';
-                    $results[] = $result;
+                    $result->observed_value = 'overdue by ' . $overdue_min . ' minute' . ($overdue_min === 1 ? '' : 's');
+                    $result->threshold      = 'should run by ' . userdate($nextrun);
+                    $results[]              = $result;
                 } else {
                     $result = new check_result(
                         $id,
@@ -126,36 +128,40 @@ class scheduled_tasks_checker implements checker {
                         'tasks',
                         'info',
                         'ok',
-                        "Task is healthy"
+                        'Task is healthy'
                     );
-                    $result->observed_value = 'last ran ' . userdate($execution);
-                    $result->threshold = 'within normal interval';
-                    $results[] = $result;
+                    $result->observed_value = $lastrun > 0 ? 'last ran ' . userdate($lastrun) : 'never run';
+                    $result->threshold      = 'within normal interval';
+                    $results[]              = $result;
                 }
             }
         }
 
         // Check adhoc task queue.
         $adhoc_count = $this->get_adhoc_task_count();
+        $adhoc_severity = 'info';
+        $adhoc_status   = 'ok';
+        $adhoc_message  = 'Adhoc task queue is healthy';
+        if ($adhoc_count > 500) {
+            $adhoc_severity = 'critical';
+            $adhoc_status   = 'backlog';
+            $adhoc_message  = 'Adhoc task queue has a large backlog';
+        } else if ($adhoc_count > 100) {
+            $adhoc_severity = 'warning';
+            $adhoc_status   = 'building';
+            $adhoc_message  = 'Adhoc task queue is growing';
+        }
+
         $adhoc_result = new check_result(
             'adhoc_queue',
             'Adhoc Task Queue',
             'tasks',
-            'info',
-            'ok',
-            'Adhoc task queue is healthy'
+            $adhoc_severity,
+            $adhoc_status,
+            $adhoc_message
         );
-        $adhoc_result->observed_value = "{$adhoc_count} tasks queued";
-        $adhoc_result->threshold = 'queue should not exceed 100 tasks';
-
-        if ($adhoc_count > 100) {
-            $adhoc_result->severity = 'warning';
-            $adhoc_result->status = 'building';
-        }
-        if ($adhoc_count > 500) {
-            $adhoc_result->severity = 'critical';
-            $adhoc_result->status = 'backlog';
-        }
+        $adhoc_result->observed_value = "{$adhoc_count} task" . ($adhoc_count === 1 ? '' : 's') . ' queued';
+        $adhoc_result->threshold      = 'warn > 100, critical > 500';
         $results[] = $adhoc_result;
 
         return $results;
@@ -170,7 +176,7 @@ class scheduled_tasks_checker implements checker {
     }
 
     /**
-     * Count adhoc tasks in queue.
+     * Count pending adhoc tasks.
      *
      * @return int
      */
@@ -179,4 +185,3 @@ class scheduled_tasks_checker implements checker {
         return $DB->count_records('task_adhoc');
     }
 }
-
