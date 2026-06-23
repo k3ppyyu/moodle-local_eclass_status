@@ -21,8 +21,17 @@ use local_eclass_status\check_result;
 /**
  * Checker for MySQL/MariaDB database connectivity.
  *
- * Tests configured MySQL servers for connection and query response time.
- * Warn > 2s, critical > 5s.
+ * Each line in "MySQL Servers to Monitor" can be:
+ *   Direct:           127.0.0.1:3306
+ *   Plugin reference: plugin:local_sisup:dbhost:dbport:dbuser:dbpass
+ *
+ * Phase 1: TCP socket (always — works without credentials).
+ * Phase 2: MySQLi connect + SELECT 1 (when credentials available).
+ *
+ * Severity thresholds:
+ *   TCP/connection failure   → CRITICAL
+ *   Total latency > 5 000 ms → CRITICAL
+ *   Total latency > 2 000 ms → WARNING
  *
  * @package   local_eclass_status
  * @copyright 2026 York University
@@ -38,102 +47,108 @@ class mysql_checker implements checker {
             return $results;
         }
 
-        $hosts = array_filter(array_map('trim', explode("\n", $mysql_hosts)));
+        $lines = array_filter(array_map('trim', explode("\n", $mysql_hosts)));
 
-        foreach ($hosts as $host) {
-            $parts = explode(':', $host);
-            $hostname = $parts[0];
-            $port = isset($parts[1]) ? (int)$parts[1] : 3306;
-            $username = get_config('local_eclass_status', 'mysql_user_' . \clean_filename($hostname));
-            $password = get_config('local_eclass_status', 'mysql_pass_' . \clean_filename($hostname));
-
-            $id = 'mysql_' . \clean_filename($hostname);
-            $name = "MySQL: $hostname:$port";
-
-            // Skip if no credentials configured.
-            if (empty($username) || empty($password)) {
+        foreach ($lines as $line) {
+            $conn = connection_resolver::resolve($line, 3306);
+            if ($conn === null) {
                 continue;
             }
 
-            $start = microtime(true);
-            $connection = @mysqli_connect($hostname, $username, $password, null, $port);
-            $elapsed = (microtime(true) - $start) * 1000; // ms
+            $hostname = $conn['hostname'];
+            $port     = $conn['port'];
+            $username = $conn['username'];
+            $password = $conn['password'];
+            $label    = $conn['label'] ?? null;
 
-            if (!$connection) {
-                $result = new check_result(
-                    $id,
-                    $name,
-                    'external',
-                    'critical',
-                    'down',
-                    "Cannot connect to MySQL server"
-                );
-                $result->observed_value = "Connection failed";
-                $result->threshold = "Connection should succeed";
-                $results[] = $result;
-                continue;
-            }
+            $id   = 'mysql_' . \clean_filename($hostname);
+            $name = 'MySQL: ' . ($label ?? "$hostname:$port");
 
-            // Test query.
-            $start = microtime(true);
-            $query_result = @mysqli_query($connection, 'SELECT 1');
-            $query_elapsed = (microtime(true) - $start) * 1000; // ms
-
-            if (!$query_result) {
-                @mysqli_close($connection);
-                $result = new check_result(
-                    $id,
-                    $name,
-                    'external',
-                    'critical',
-                    'down',
-                    "Query execution failed"
-                );
-                $result->observed_value = "Query failed: " . @mysqli_error($connection);
-                $result->threshold = "Query should execute successfully";
-                $results[] = $result;
-                continue;
-            }
-
-            @mysqli_close($connection);
-
-            // Check response time of combined connect + query.
-            $total_elapsed = $elapsed + $query_elapsed;
-            $severity = 'info';
-            $status = 'ok';
-
-            if ($total_elapsed > 5000) {
-                $severity = 'critical';
-                $status = 'slow';
-            } else if ($total_elapsed > 2000) {
-                $severity = 'warning';
-                $status = 'slow';
-            }
-
-            $result = new check_result(
-                $id,
-                $name,
-                'external',
-                $severity,
-                $status,
-                "MySQL server connectivity check"
+            // --- Phase 1: TCP socket ------------------------------------------------
+            $errno  = 0;
+            $errstr = '';
+            $start  = microtime(true);
+            $socket = @stream_socket_client(
+                'tcp://' . $hostname . ':' . $port,
+                $errno,
+                $errstr,
+                5,
+                STREAM_CLIENT_CONNECT
             );
-            $result->observed_value = round($total_elapsed, 0) . "ms (connect: " . round($elapsed, 0) . "ms, query: " . round($query_elapsed, 0) . "ms)";
-            $result->threshold = "< 2000ms warning, > 5000ms critical";
-            $result->data = ['response_ms' => round($total_elapsed, 0)];
-            $results[] = $result;
+            $elapsed = (microtime(true) - $start) * 1000;
+
+            if ($socket === false) {
+                $result = new check_result($id, $name, 'external', 'critical', 'down',
+                    'Cannot connect to MySQL server');
+                $result->observed_value = 'TCP connection failed' . (!empty($errstr) ? ': ' . $errstr : '');
+                $result->threshold      = 'Connection should succeed';
+                $result->data           = ['errno' => $errno, 'error' => $errstr, 'source' => $conn['source']];
+                $results[]              = $result;
+                continue;
+            }
+            fclose($socket);
+
+            // --- Phase 2 (optional): full auth + query --------------------------------
+            if (!empty($username) && !empty($password)) {
+                $db_start   = microtime(true);
+                $dbconn     = @mysqli_connect($hostname, $username, $password, null, $port);
+                $db_elapsed = (microtime(true) - $db_start) * 1000;
+
+                if (!$dbconn) {
+                    $result = new check_result($id, $name, 'external', 'critical', 'down',
+                        'TCP reachable but MySQL auth/connection failed');
+                    $result->observed_value = 'Auth failed: ' . @mysqli_connect_error();
+                    $result->threshold      = 'Connection with credentials should succeed';
+                    $result->data           = ['source' => $conn['source']];
+                    $results[]              = $result;
+                    continue;
+                }
+
+                $q_start   = microtime(true);
+                $qr        = @mysqli_query($dbconn, 'SELECT 1');
+                $q_elapsed = (microtime(true) - $q_start) * 1000;
+                @mysqli_close($dbconn);
+
+                if (!$qr) {
+                    $result = new check_result($id, $name, 'external', 'critical', 'query_failed',
+                        'Connected but query failed');
+                    $result->observed_value = 'SELECT 1 failed';
+                    $result->threshold      = 'Query should execute successfully';
+                    $results[]              = $result;
+                    continue;
+                }
+
+                $total    = $db_elapsed + $q_elapsed;
+                $severity = $total > 5000 ? 'critical' : ($total > 2000 ? 'warning' : 'info');
+
+                $result = new check_result($id, $name, 'external', $severity, 'ok',
+                    'MySQL server connectivity check (with auth)');
+                $result->observed_value = round($total, 0) . 'ms (connect: ' . round($db_elapsed, 0) . 'ms, query: ' . round($q_elapsed, 0) . 'ms)';
+                $result->threshold      = '< 2000ms warning, > 5000ms critical';
+                $result->data           = ['response_ms' => round($total, 0), 'source' => $conn['source']];
+                $results[]              = $result;
+
+            } else {
+                // TCP-only result.
+                $severity = $elapsed > 5000 ? 'critical' : ($elapsed > 2000 ? 'warning' : 'info');
+
+                $result = new check_result($id, $name, 'external', $severity, 'ok',
+                    'MySQL TCP connectivity check (no credentials configured)');
+                $result->observed_value = round($elapsed, 0) . 'ms TCP response';
+                $result->threshold      = '< 2000ms warning, > 5000ms critical — configure credentials for deeper check';
+                $result->data           = ['response_ms' => round($elapsed, 0), 'source' => $conn['source']];
+                $results[]              = $result;
+            }
         }
 
         return $results;
     }
 
     public function is_enabled() {
-        $mysql_hosts = get_config('local_eclass_status', 'mysql_servers');
-        return !empty($mysql_hosts);
+        return !empty(get_config('local_eclass_status', 'mysql_servers'));
     }
 
     public function get_name() {
         return 'MySQL Database Connectivity';
     }
 }
-

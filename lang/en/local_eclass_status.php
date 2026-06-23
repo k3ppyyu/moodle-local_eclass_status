@@ -45,11 +45,68 @@ $string['task:run_checks'] = 'Run health checks and send status alerts';
 
 // External connection config
 $string['config:ldap_servers'] = 'LDAP Servers to Monitor';
-$string['config:ldap_servers_help'] = 'One per line: hostname:port or hostname';
-$string['config:oracle_servers'] = 'Oracle Servers to Monitor';
-$string['config:oracle_servers_help'] = 'One per line: host:port:sid or service name';
+$string['config:ldap_servers_help'] = 'One entry per line. Blank lines and lines starting with # are ignored.
+
+Direct format:
+  hostname:port
+  hostname          (port defaults to 389)
+
+Example:
+  ldap.yorku.ca:389
+  ldap-replica.yorku.ca';
 $string['config:mysql_servers'] = 'MySQL Servers to Monitor';
-$string['config:mysql_servers_help'] = 'One per line: host:port or host (port defaults to 3306)';
+$string['config:mysql_servers_help'] = 'One entry per line. Blank lines and lines starting with # are ignored.
+
+Direct format (TCP test only — no credentials needed):
+  hostname:port
+  hostname          (port defaults to 3306)
+
+Plugin reference format (reads connection settings from another installed plugin):
+  plugin:component:host_field[:port_field[:user_field[:pass_field]]]
+
+Examples:
+  # Direct:
+  127.0.0.1:3306
+
+  # Reference local_sisup plugin config fields dbhost, dbport, dbuser, dbpass:
+  plugin:local_sisup:dbhost:dbport:dbuser:dbpass
+
+  # TCP-only check using host from local_winprism (no credentials):
+  plugin:local_winprism:mysql_host:mysql_port';
+$string['config:oracle_servers'] = 'Oracle Servers to Monitor';
+$string['config:oracle_servers_help'] = 'One entry per line. Blank lines and lines starting with # are ignored.
+
+Direct format (TCP test only):
+  hostname:port
+  hostname:port:SID
+
+Plugin reference format (reads connection settings from another installed plugin):
+  plugin:component:host_field[:port_field[:user_field[:pass_field[:sid_field]]]]
+
+Examples:
+  # Direct TCP check:
+  oracle.yorku.ca:1521
+
+  # Direct with SID:
+  oracle.yorku.ca:1521:PROD
+
+  # Reference local_sisup plugin config fields:
+  plugin:local_sisup:oraclehost:oracleport:oracleuser:oraclepass:oraclesid';
+
+// Config lookup page
+$string['config_lookup:title'] = 'Plugin Config Field Browser';
+$string['config_lookup:help'] = 'Search installed Moodle plugins by name to discover their config field names. Use the results to build plugin reference entries in the MySQL and Oracle monitoring settings.';
+$string['config_lookup:placeholder'] = 'Search plugin name — e.g. sisup, winprism';
+$string['config_lookup:search'] = 'Search';
+$string['config_lookup:noresults'] = 'No config fields found for plugins matching "{$a}".';
+$string['config_lookup:col_field'] = 'Config field';
+$string['config_lookup:col_value'] = 'Stored value';
+$string['config_lookup:col_ref'] = 'Reference string to copy';
+$string['config_lookup:usage_title'] = 'How to use these references in MySQL / Oracle settings';
+$string['config_lookup:usage_mysql'] = 'MySQL format:';
+$string['config_lookup:usage_oracle'] = 'Oracle format (add optional sid_field at the end):';
+$string['config_lookup:settings_link'] = 'Browse config fields from other plugins';
+$string['config_lookup:settings_link_desc'] = 'Use the <a href="{$a}">Plugin Config Field Browser</a> to search any installed plugin\'s config fields and build <code>plugin:component:field</code> reference strings for the MySQL and Oracle monitors below. Sensitive fields (passwords, tokens) are automatically hidden.';
 
 // Dashboard/View strings
 $string['dashboard:title'] = 'Health Status Dashboard';

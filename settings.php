@@ -70,6 +70,13 @@ $settings->add(new admin_setting_configmulticheckbox(
 
 
 // External Services Configuration.
+$lookupurl = new moodle_url('/local/eclass_status/config_lookup.php');
+$settings->add(new admin_setting_description(
+    'local_eclass_status/config_lookup_link',
+    get_string('config_lookup:settings_link', 'local_eclass_status'),
+    get_string('config_lookup:settings_link_desc', 'local_eclass_status', $lookupurl->out(false))
+));
+
 $settings->add(new admin_setting_heading(
     'local_eclass_status/ldap_heading',
     get_string('check:category:external', 'local_eclass_status') . ': LDAP',
