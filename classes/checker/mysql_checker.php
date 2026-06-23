@@ -44,10 +44,10 @@ class mysql_checker implements checker {
             $parts = explode(':', $host);
             $hostname = $parts[0];
             $port = isset($parts[1]) ? (int)$parts[1] : 3306;
-            $username = get_config('local_eclass_status', 'mysql_user_' . sanitize_filename($hostname));
-            $password = get_config('local_eclass_status', 'mysql_pass_' . sanitize_filename($hostname));
+            $username = get_config('local_eclass_status', 'mysql_user_' . \clean_filename($hostname));
+            $password = get_config('local_eclass_status', 'mysql_pass_' . \clean_filename($hostname));
 
-            $id = "mysql_" . sanitize_filename($hostname);
+            $id = 'mysql_' . \clean_filename($hostname);
             $name = "MySQL: $hostname:$port";
 
             // Skip if no credentials configured.

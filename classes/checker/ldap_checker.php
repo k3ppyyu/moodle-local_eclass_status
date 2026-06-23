@@ -47,7 +47,7 @@ class ldap_checker implements checker {
             $hostname = $parts[0];
             $port = isset($parts[1]) ? (int)$parts[1] : 389;
 
-            $id = "ldap_" . sanitize_filename($hostname);
+            $id = 'ldap_' . \clean_filename($hostname);
             $name = "LDAP: $hostname:$port";
 
             $start = microtime(true);
