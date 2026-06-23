@@ -78,6 +78,15 @@ class email_notifier {
             return false;
         }
 
+        $emailinterval = (int)get_config('local_eclass_status', 'email_interval');
+        $lastsent = (int)get_config('local_eclass_status', 'last_email_sent');
+        if ($emailinterval > 0 && $lastsent > 0) {
+            $minnextsend = $lastsent + ($emailinterval * MINSECS);
+            if (time() < $minnextsend) {
+                return false;
+            }
+        }
+
         $fromuser = \core_user::get_support_user();
 
         // Determine subject based on highest severity being alerted.
@@ -102,6 +111,8 @@ class email_notifier {
 
             email_to_user($touser, $fromuser, $subject, $plaintext, $body);
         }
+
+        set_config('last_email_sent', time(), 'local_eclass_status');
 
         return true;
     }

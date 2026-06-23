@@ -46,6 +46,14 @@ $settings->add(new admin_setting_configtext(
     PARAM_INT
 ));
 
+$settings->add(new admin_setting_configtext(
+    'local_eclass_status/email_interval',
+    get_string('setting:email_interval', 'local_eclass_status'),
+    get_string('setting:email_interval_help', 'local_eclass_status'),
+    '30',
+    PARAM_INT
+));
+
 $severity_choices = [
     'info' => get_string('setting:alert_severity_info', 'local_eclass_status'),
     'warning' => get_string('setting:alert_severity_warning', 'local_eclass_status'),

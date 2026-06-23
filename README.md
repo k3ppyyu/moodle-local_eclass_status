@@ -49,7 +49,8 @@ This keeps the inbox quiet by default while allowing ops teams to opt-in to verb
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | **Alert Recipients** | *(empty)* | Email addresses to receive alerts |
-| **Check Interval** | 5 minutes | How often to run health checks |
+| **Check Interval** | 5 minutes | Reference value only; actual cadence is set in Scheduled tasks |
+| **Minimum Email Interval** | 30 minutes | Minimum gap between alert emails |
 | **Alert Severity Levels** | Critical only | Which severity levels trigger email alerts |
 
 ### Alert Severity Levels (Configurable)
@@ -61,6 +62,20 @@ In **Site Administration > Plugins > Local plugins > EClass Status**, select whi
 - **☐ Info** (unchecked by default) — Healthy status, passed checks
 
 **Recommendation:** Keep only **Critical** selected to minimize email volume. Use the dashboard to review warnings and info items proactively.
+
+### Alert Frequency
+
+Two separate timings matter:
+
+1. **Check frequency**
+   - The scheduled task is registered to run every 5 minutes by default.
+   - In Moodle, the real cadence is managed at **Site administration > Server > Scheduled tasks**.
+   - The plugin's `Check Interval` setting is informational and should match whatever you choose there.
+
+2. **Email frequency**
+   - The plugin now has a `Minimum Email Interval (minutes)` setting.
+   - Example: if checks run every 5 minutes and `Minimum Email Interval` is `30`, matching alerts can send at most once every 30 minutes.
+   - Set it to `0` only for aggressive testing, because that sends on every matching task run.
 
 ### External Services
 
@@ -200,6 +215,48 @@ To add a new health check:
    - `threshold`: what was expected (e.g., "must be under 2 hours")
 
 ## Troubleshooting
+
+### How do I test a lost connection alert?
+
+#### LDAP
+Use a host or port that is guaranteed to fail.
+
+Examples for the LDAP servers setting:
+
+```text
+127.0.0.1:1
+no-such-host.invalid:389
+```
+
+- `127.0.0.1:1` usually fails immediately because port 1 is closed.
+- `no-such-host.invalid:389` usually fails DNS resolution.
+
+Either one should produce a critical LDAP connectivity result on the next task run.
+
+#### MySQL
+Use a host/port that will refuse connections, or configure a valid host with an intentionally wrong port.
+
+Examples:
+
+```text
+127.0.0.1:1
+mysql.invalid:3306
+```
+
+Note: the MySQL checker only runs for hosts where credentials are available in plugin config. If no credentials are stored for that host, the checker skips it.
+
+#### Long-running task alert
+The current runtime thresholds are high enough that simulating a real 4-hour task is impractical for quick testing. For testing, the easier path is to validate LDAP/MySQL failure alerts first.
+
+#### Manual test run
+
+Run the plugin task manually inside the Moodle container/root:
+
+```bash
+php admin/cli/scheduled_task.php --execute='\local_eclass_status\task\run_checks'
+```
+
+For repeated email testing, temporarily set `Minimum Email Interval` to `0`, run the task, then restore it to a safer value such as `15` or `30`.
 
 ### No alerts being sent
 1. Check that recipients are configured in settings

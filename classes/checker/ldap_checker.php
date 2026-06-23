@@ -51,36 +51,34 @@ class ldap_checker implements checker {
             $name = "LDAP: $hostname:$port";
 
             $start = microtime(true);
-            $connection = @ldap_connect($hostname, $port);
+            $errno = 0;
+            $errstr = '';
+            $socket = @stream_socket_client(
+                'tcp://' . $hostname . ':' . $port,
+                $errno,
+                $errstr,
+                5,
+                STREAM_CLIENT_CONNECT
+            );
             $elapsed = (microtime(true) - $start) * 1000; // ms
 
-            if (!$connection) {
+            if ($socket === false) {
                 $result = new check_result(
                     $id,
                     $name,
                     'external',
                     'critical',
                     'down',
-                    "Cannot connect to LDAP server"
+                    'Cannot connect to LDAP server'
                 );
-                $result->observed_value = "Connection failed";
-                $result->threshold = "Connection should succeed";
+                $result->observed_value = 'Connection failed' . (!empty($errstr) ? ': ' . $errstr : '');
+                $result->threshold = 'Connection should succeed';
+                $result->data = ['errno' => $errno, 'error' => $errstr];
                 $results[] = $result;
                 continue;
             }
 
-            // Try to set LDAP version and connection timeout.
-            @ldap_set_option($connection, LDAP_OPT_PROTOCOL_VERSION, 3);
-            @ldap_set_option($connection, LDAP_OPT_NETWORK_TIMEOUT, 3);
-
-            // If Moodle has configured LDAP auth, try to bind.
-            $auth_ldap = get_auth_plugin('ldap');
-            if ($auth_ldap && method_exists($auth_ldap, 'ldap_bind')) {
-                // Try bind - this requires Moodle LDAP auth settings.
-                // For now, just close the connection and check response time.
-            }
-
-            @ldap_close($connection);
+            fclose($socket);
 
             // Check response time.
             $severity = 'info';

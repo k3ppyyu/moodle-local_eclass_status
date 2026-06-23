@@ -39,8 +39,7 @@ class run_checks extends scheduled_task {
     public function execute() {
         $recipients = get_config('local_eclass_status', 'recipients');
         if (empty($recipients)) {
-            mtrace('local_eclass_status: No recipients configured. Skipping health checks.');
-            return;
+            mtrace('local_eclass_status: No recipients configured. Checks will run, but email alerts are disabled.');
         }
 
         mtrace('local_eclass_status: Starting health checks...');
