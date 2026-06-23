@@ -40,7 +40,7 @@ class email_notifier {
      * @return bool True if email sent
      */
     public static function send_alert($results) {
-        global $PAGE, $SITE;
+        global $OUTPUT, $SITE;
 
         if (empty($results)) {
             return false;
@@ -96,8 +96,10 @@ class email_notifier {
             : get_string('email:subject:warning', 'local_eclass_status');
 
         $dashboardurl = (new \moodle_url('/local/eclass_status/view.php'))->out(false);
-        $renderer = $PAGE->get_renderer('local_eclass_status');
-        $body = $renderer->render_from_template('local_eclass_status/email_alert', self::build_email_context($to_alert, $dashboardurl, $SITE->fullname));
+        $body = $OUTPUT->render_from_template(
+            'local_eclass_status/email_alert',
+            self::build_email_context($to_alert, $dashboardurl, $SITE->fullname)
+        );
         $plaintext = html_to_text($body);
 
         foreach ($emails as $email) {
